@@ -101,7 +101,7 @@ function M.request(ctx, cfg, share, mode, pane_dir, records)
       block = {
         flavor = "com.superlogical.terminal.shell",
         label = M.LABEL,
-        options = { command = argv },
+        options = { command = argv, interactive = cfg.interactive_shell },
       },
     },
   }

@@ -98,6 +98,16 @@ local nr = #config.DEFAULT_PREVIEW
 T.eq("argv first root kind", argv[18 + 2 * nr + 1], "pwd")
 T.eq("argv total", #argv, 18 + 2 * nr + 7)
 T.eq("request focuses", req.focus, true)
+T.eq("request reads the interactive startup files", req.layout.block.options.interactive, true)
+local plain = picker.request(
+  { session_id = "s", block_id = "b" },
+  config.build({ interactive_shell = false }),
+  share,
+  "files",
+  "/work",
+  {}
+)
+T.eq("interactive_shell = false", plain.layout.block.options.interactive, false)
 T.eq("request bounds", req.bounds, cfg.pane_bounds)
 
 -- setup registers actions and binds nothing

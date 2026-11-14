@@ -99,6 +99,7 @@ local PROFILE_FIELDS = {
   copy_cmd = true,
   fzf_options = true,
   pane_bounds = true,
+  interactive_shell = true,
   title = true,
 }
 
@@ -128,6 +129,10 @@ local function defaults()
     copy_cmd = nil,
     fzf_options = "",
     pane_bounds = { 0.05, 0.06, 0.9, 0.88 },
+    -- Start picker panes with the user's interactive shell environment
+    -- (e.g. ~/.zshrc), so host tools are found on the same PATH as in
+    -- their terminals.
+    interactive_shell = true,
     title = nil,
     profiles = {},
   }
@@ -331,6 +336,9 @@ CHECKS = {
     if not is_list_of(v, "number") or #v ~= 4 then
       fail("pane_bounds must be four numbers { x, y, width, height }")
     end
+  end,
+  interactive_shell = function(v)
+    check_bool("interactive_shell", v)
   end,
   title = function(v)
     if type(v) ~= "string" or v == "" then

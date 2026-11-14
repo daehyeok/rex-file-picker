@@ -32,7 +32,7 @@ Fuzzy-pick files in a [Rex](https://www.superlogical.com/rex) terminal pane with
 ## Requirements
 
 - On the host each pane runs on:
-  - `sh`, `awk`, `sed` and [fzf](https://github.com/junegunn/fzf) (tested with 0.75).
+  - `sh`, `awk`, `sed` and [fzf](https://github.com/junegunn/fzf) (tested with 0.75), on the `PATH` your terminals have there: the picker starts through your shell and reads its startup files, `~/.zshrc` included (see [`interactive_shell`](#configuration)).
   - [fd](https://github.com/sharkdp/fd) (recommended; `fdfind` works too). Without it the picker uses `find`, which can't read `.gitignore` files: it lists ignored files, and leaves out only `.git` and hidden names.
   - Optional, for previews and modes: `bat` (or `batcat`), `mdcat`, `kitten` (from [kitty](https://sw.kovidgoyal.net/kitty/)), `tree`, `file`, `zoxide`.
 - The Rex app as your client. Copy uses OSC 52, which Rex passes to the Mac clipboard, so it works the same from remote panes.
@@ -107,6 +107,7 @@ Every option is optional. An unknown or misspelled option, root field, preview f
 | `copy_cmd` | none (OSC 52) | a shell command, run on the pane's host, that gets the text on stdin |
 | `fzf_options` | `""` | extra fzf flags |
 | `pane_bounds` | `{ 0.05, 0.06, 0.9, 0.88 }` | the picker's position and size, as fractions of the window |
+| `interactive_shell` | `true` | start the picker with your shell's interactive startup files (e.g. `~/.zshrc`), so it finds tools on the same `PATH` as your terminals; `false` uses only the login environment (`~/.zprofile`, ...) and starts a little faster |
 | `title` | `"Pick a File"` | the `pick_file` title in the command palette |
 | [`profiles`](#profiles) | `{}` | named settings, each its own action |
 

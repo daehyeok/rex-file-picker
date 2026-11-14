@@ -1,9 +1,9 @@
 -- file_picker/picker.lua: builds the floating picker pane.
 --
--- Runs in the Rex config on the client. The pane runs share/picker.sh on the
--- host of the pane the user is in; everything it needs (helper scripts,
--- keys, preview rules, roots) travels as arguments, because the client can't
--- write files on a remote host.
+-- Runs in the Rex config on the local Rex server. The pane runs
+-- share/picker.sh on the host of the pane the user is in; everything it needs
+-- (helper scripts, keys, preview rules, roots) travels as arguments, because
+-- the local Rex server can't write files on a remote host.
 
 local rexapi = require "file_picker.rexapi"
 local roots = require "file_picker.roots"

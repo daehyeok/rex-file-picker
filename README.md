@@ -2,7 +2,7 @@
 
 [![test](https://github.com/daehyeok/rex-file-picker/actions/workflows/test.yml/badge.svg)](https://github.com/daehyeok/rex-file-picker/actions/workflows/test.yml)
 
-Fuzzy-pick files in a [Rex](https://www.superlogical.com/rex) terminal pane with [fzf](https://github.com/junegunn/fzf), from the pane's directory and any other folders you choose, preview them, and insert or copy their paths, in local and remote ssh panes alike. Inspired by [tmux-file-picker](https://github.com/raine/tmux-file-picker).
+Fuzzy-pick files in a [Rex](https://www.superlogical.com/rex) terminal pane with [fzf](https://github.com/junegunn/fzf), from the pane's directory and any other folders you choose, preview them, and insert or copy their paths, in local panes and panes on remote Rex hosts alike. Inspired by [tmux-file-picker](https://github.com/raine/tmux-file-picker).
 
 <!-- TODO: demo GIF, e.g. ![demo](docs/demo.gif) -->
 
@@ -24,17 +24,17 @@ Fuzzy-pick files in a [Rex](https://www.superlogical.com/rex) terminal pane with
 - **Each file once:** when folders overlap, a file is listed under the first folder in your list.
 - **Insert or copy:** `enter` types the selected paths into your pane (shell-quoted, nothing runs), and `ctrl-y` copies them to your Mac's clipboard. `alt-A`/`alt-R` and `alt-a`/`alt-r` do the same with absolute or pane-relative paths. Mark several files with `tab`.
 - **Relative or absolute paths, per folder:** relative for the pane's directory and absolute for other folders by default.
-- **Previews by file type**, run on the pane's host: [mdcat](https://github.com/swsnr/mdcat) for Markdown, [bat](https://github.com/sharkdp/bat) (or `cat`) for text, `kitten icat` for images, `tree` (or `ls`) for folders. You can add or replace rules.
+- **Previews by file type**, run on the pane's host: [mdcat](https://github.com/swsnr/mdcat) or [glow](https://github.com/charmbracelet/glow) for Markdown, [bat](https://github.com/sharkdp/bat) (or `cat`) for text, `kitten icat` for images, `tree` (or `ls`) for folders. You can add or replace rules.
 - **Zoxide and directories:** pick from [zoxide](https://github.com/ajeetdsouza/zoxide)'s frecent directories, or switch the list to folders only.
 - **Arrow and Emacs keys:** `up`/`ctrl-p`, `down`/`ctrl-n`, `page-down`/`ctrl-v`, `page-up`/`alt-v`, `esc`/`ctrl-g`. Every key can be changed.
-- **Remote panes:** the picker runs on the pane's host through Rex, so remote files are listed and previewed where they are, with nothing to install there but fzf.
+- **Remote panes:** panes on a remote Rex host (`rex hosts add` / `rex.host`, over SSH, Tailscale, etc.) run the picker and its CLI tools (`fzf`, `fd`, previewers, `zoxide`) directly on that host, with no plugin files to install there.
 
 ## Requirements
 
 - On the host each pane runs on:
-  - `sh`, `awk`, `sed` and [fzf](https://github.com/junegunn/fzf) (tested with 0.75), on the `PATH` your terminals have there: the picker starts through your shell and reads its startup files, `~/.zshrc` included (see [`interactive_shell`](#configuration)).
+  - `sh`, `awk`, `sed` and [fzf](https://github.com/junegunn/fzf) 0.38+ (for `become`; tested with 0.75), on the `PATH` your terminals have there: the picker starts through your shell and reads its startup files, `~/.zshrc` included (see [`interactive_shell`](#configuration)).
   - [fd](https://github.com/sharkdp/fd) (recommended; `fdfind` works too). Without it the picker uses `find`, which can't read `.gitignore` files: it lists ignored files, and leaves out only `.git` and hidden names.
-  - Optional, for previews and modes: `bat` (or `batcat`), `mdcat`, `kitten` (from [kitty](https://sw.kovidgoyal.net/kitty/)), `tree`, `file`, `zoxide`.
+  - Optional, for previews and modes: `bat` (or `batcat`), `mdcat`, `glow`, `kitten` (from [kitty](https://sw.kovidgoyal.net/kitty/)), `tree`, `file`, `zoxide`.
 - The Rex app as your client. Copy uses OSC 52, which Rex passes to the Mac clipboard, so it works the same from remote panes.
 
 ## Quick start
@@ -126,7 +126,7 @@ A list of folders, searched in order. Each entry is one of:
 Every entry can also set `label` (shown before its rows; default: the folder's name), `path_style`, `hidden`, `ignore` and `exclude`. A root whose folder doesn't exist, whose command prints no existing folder (its exit status doesn't matter), or whose function returns `nil` is left out. Leave out `{ kind = "pwd" }` to search only other folders.
 
 > [!NOTE]
-> Lua functions run in your Rex config on the client (your Mac), so they can't look at a remote host's files. Use them to choose by host or to build a path from the pane's directory. To find a folder by looking at the disk, use `cmd`, which runs on the pane's host.
+> Lua functions run in `init.lua` on your local Rex server (the machine with `~/.config/rex/init.lua`), so they can't look at a remote host's files. Use them to choose by host or to build a path from the pane's directory. To find a folder by looking at the disk, use `cmd`, which runs on the pane's host.
 
 `ctx` holds `host` (the pane's server label, or `"local"`), `server`, `pwd`, `session_id` and `block_id`.
 
@@ -207,7 +207,7 @@ profiles = {
 
 ## How it works
 
-The action runs in your Rex config. It asks Rex for the pane's working directory, works out the roots (calling any Lua functions), and opens a floating pane over yours, on the server that owns your pane. That pane runs the picker script under `/bin/sh` on the pane's host. The script and its helpers travel as arguments, so nothing has to be installed there. Listing, previews and zoxide all run on that host. When you pick, the script types the paths into your pane with the host's `rex send`, or copies them with OSC 52, gives focus back to your pane, and closes. Nothing keeps running while the picker is closed.
+The action runs in `init.lua` on your local Rex server (the machine with `~/.config/rex/init.lua`). It asks Rex for the pane's working directory, works out the roots (calling any Lua functions locally), and opens a floating pane over yours on the Rex server that owns your pane — local, or a remote host added with `rex hosts add` / `rex.host` (plain `ssh` inside a local shell pane stays on the local server). That pane runs the picker script under `/bin/sh` on the pane's host; the script and its helpers travel as arguments, so no plugin files have to be installed there, while `fzf`, listing, previews and `zoxide` all run on that host. When you pick, the script types the paths into your pane with the host's `rex send` or copies them with OSC 52, the Rex app renders kitty images and applies OSC 52 to your clipboard, and focus returns to your pane when the picker closes. Nothing keeps running while the picker is closed.
 
 See [docs/design.md](docs/design.md) for more.
 

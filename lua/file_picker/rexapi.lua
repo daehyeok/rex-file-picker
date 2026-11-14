@@ -1,9 +1,9 @@
 -- file_picker/rexapi.lua: the few Rex calls the plugin needs, with the
 -- remote-server fallback.
 --
--- Runs in the Rex config (init.lua) on the client. A pane on a remote host
--- belongs to that host's Rex server: calls about it go first to the local
--- server, and when that finds nothing, to rex.server(ctx.server).
+-- Runs in the Rex config (init.lua) on the local Rex server. A pane on a
+-- remote Rex host belongs to that host's Rex server: calls about it go first
+-- to the local server, and when that finds nothing, to rex.server(ctx.server).
 
 local M = {}
 
@@ -23,8 +23,8 @@ local function file_exists(path)
 end
 M.file_exists = file_exists
 
--- Returns the path of the client's rex CLI: $REX_BIN_DIR/rex, then the macOS
--- app bundle, then plain "rex" from PATH.
+-- Returns the path of the local Rex CLI: $REX_BIN_DIR/rex, then the macOS app
+-- bundle, then plain "rex" from PATH.
 function M.rex_cli()
   local bin = os.getenv("REX_BIN_DIR")
   if bin and bin ~= "" and file_exists(bin .. "/rex") then

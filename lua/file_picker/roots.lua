@@ -1,9 +1,9 @@
 -- file_picker/roots.lua: turns the `roots` option into the records the host
 -- script resolves.
 --
--- Runs in the Rex config on the client. Lua functions (path = fn, cmd = fn)
--- are called here, with the pane context, so they can choose by host or
--- build from the pane's directory, but can't look at a remote host's disk.
+-- Runs in the Rex config on the local Rex server. Lua functions (path = fn,
+-- cmd = fn) are called here, with the pane context, so they can choose by host
+-- or build from the pane's directory, but can't look at a remote host's disk.
 -- Commands run later, on the pane's host, in the pane's directory.
 
 local M = {}

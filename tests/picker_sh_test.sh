@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2016 # flags tested contain literal $D for fzf's subshell
 # Tests for share/picker.sh with stub fzf and rex. Run from anywhere:
 # sh path/to/picker_sh_test.sh
 dir=$(cd "$(dirname "$0")" && pwd)
@@ -32,6 +33,8 @@ cat > "$bin/fzf" <<EOF
 #!/bin/sh
 for a in "\$@"; do printf '%s\n' "\$a"; done > "$t/fzf_args"
 cat > "$t/fzf_in"
+printf '%s\n' "\${D:-}" > "$t/fzf_d"
+[ -n "\${D:-}" ] && sh -c 'sh "\$D/preview.sh" "\$1"' _ "$t/pane/a.txt" > "$t/prev_out"
 EOF
 cat > "$bin/rex" <<EOF
 #!/bin/sh
@@ -43,7 +46,7 @@ unset REX_BIN_DIR
 binds=$(printf 'enter\tinsert\nctrl-y\tcopy\nalt-A\tinsert_absolute\nalt-R\tinsert_relative\nalt-a\tcopy_absolute\nalt-r\tcopy_relative\nesc\tclose\nctrl-g\tclose\nctrl-n\tdown\nalt-v\tpage_up\nctrl-t\ttoggle_dirs\nctrl-z\ttoggle_zoxide\nctrl-/\ttoggle_preview')
 open_picker() { # MODE ROOTFIELDS...
   mode=$1; shift
-  : > "$t/rex_log"; rm -f "$t/fzf_args" "$t/fzf_in"
+  : > "$t/rex_log"; rm -f "$t/fzf_args" "$t/fzf_in" "$t/prev_out" "$t/fzf_d"
   PATH="$bin:$sys" "$sys/sh" -c "$(cat "$share/picker.sh")" file-picker block:o "$t/pane" "$bin/rex" \
     "$(cat "$share/list.sh")" "$(cat "$share/preview.sh")" "$(cat "$share/done.sh")" \
     "$mode" "$binds" "--no-mouse" "" absolute "right,55%" "enter insert" \
@@ -56,19 +59,18 @@ has "multi" "$a" "--multi"
 has "header lines" "$a" "--header-lines=1"
 has "hint" "$a" "--header=enter insert"
 has "preview window" "$a" "--preview-window=right,55%"
-has "insert bind" "$a" "--bind=enter:become(sh "
-has "insert uses insert paths" "$a" "/done.sh insert {+2})"
-has "copy bind" "$a" "/done.sh copy {+2})"
-has "insert absolute bind" "$a" "--bind=alt-A:become(sh "
-has "insert absolute uses absolute paths" "$a" "/done.sh insert {+3})"
-has "insert relative uses relative paths" "$a" "/done.sh insert {+4})"
-has "copy absolute uses absolute paths" "$a" "/done.sh copy {+3})"
-has "copy relative uses relative paths" "$a" "/done.sh copy {+4})"
+has "preview quotes D" "$a" '--preview=sh "$D/preview.sh" {3}'
+has "insert bind" "$a" '--bind=enter:become(sh "$D/done.sh" insert {+2})'
+has "copy bind" "$a" '--bind=ctrl-y:become(sh "$D/done.sh" copy {+2})'
+has "insert absolute bind" "$a" '--bind=alt-A:become(sh "$D/done.sh" insert {+3})'
+has "insert relative bind" "$a" '--bind=alt-R:become(sh "$D/done.sh" insert {+4})'
+has "copy absolute bind" "$a" '--bind=alt-a:become(sh "$D/done.sh" copy {+3})'
+has "copy relative bind" "$a" '--bind=alt-r:become(sh "$D/done.sh" copy {+4})'
 has "close esc" "$a" "--bind=esc:abort"
 has "close ctrl-g" "$a" "--bind=ctrl-g:abort"
 has "emacs down" "$a" "--bind=ctrl-n:down"
 has "page up" "$a" "--bind=alt-v:page-up"
-has "dirs toggle" "$a" "/list.sh toggle-dirs)+first"
+has "dirs toggle" "$a" '--bind=ctrl-t:reload(sh "$D/list.sh" toggle-dirs)+first'
 has "preview toggle" "$a" "--bind=ctrl-/:toggle-preview"
 lacks "no zoxide, no toggle" "$a" "toggle-zoxide"
 has "extra fzf options" "$a" "--no-mouse"
@@ -91,7 +93,13 @@ has "zoxide missing" "$(cat "$t/out")" "zoxide is not installed"
 printf '#!/bin/sh\necho "%s"\n' "$t/pane" > "$bin/zoxide"; chmod +x "$bin/zoxide"
 open_picker zoxide
 eq "zoxide header" "$(sed -n 1p "$t/fzf_in")" "zoxide directories"
-has "zoxide toggle bound" "$(cat "$t/fzf_args")" "/list.sh toggle-zoxide)+first"
+has "zoxide toggle bound" "$(cat "$t/fzf_args")" '--bind=ctrl-z:reload(sh "$D/list.sh" toggle-zoxide)+first'
+
+mkdir -p "$t/tmp (a,b)"
+printf 'hi\n' > "$t/pane/a.txt"
+(unset TMPDIR; TMPDIR="$t/tmp (a,b)"; export TMPDIR; open_picker files pwd "" "" relative 0 1 "")
+has "hostile TMPDIR used" "$(cat "$t/fzf_d")" "tmp (a,b)"
+eq "hostile TMPDIR preview runs" "$(cat "$t/prev_out")" "hi"
 
 # An fzf outside PATH (e.g. only in ~/.local/bin) is not used.
 mv "$bin/fzf" "$HOME/.local/bin/fzf"

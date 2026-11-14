@@ -1,8 +1,8 @@
 -- file_picker/message.lua: one-line messages in a small floating pane.
 --
--- Runs in the Rex config on the client. The pane itself (share/message.sh)
--- runs on the host of the pane the user is in, closes after about a second or
--- on any key, and gives focus back to that pane.
+-- Runs in the Rex config on the local Rex server. The pane itself
+-- (share/message.sh) runs on the host of the pane the user is in, closes after
+-- about a second or on any key, and gives focus back to that pane.
 
 local rexapi = require "file_picker.rexapi"
 

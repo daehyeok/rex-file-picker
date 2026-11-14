@@ -90,27 +90,29 @@ sh "$D/list.sh" resolve
 
 set -f # keys and fzf options are not file patterns
 TAB=$(printf '\t')
+# shellcheck disable=SC2016 # $D expands in fzf's subshell
 set -- fzf --multi --layout=reverse --delimiter="$TAB" --with-nth=1 --header-lines=1 \
   --prompt='> ' --header="$hint" \
-  --preview="sh $D/preview.sh {3}" --preview-window="$pwin"
+  --preview='sh "$D/preview.sh" {3}' --preview-window="$pwin"
+# shellcheck disable=SC2016 # $D expands in fzf's subshell
 while IFS=$TAB read -r key action; do
   [ -n "$key" ] || continue
   case $action in
-    insert) a="become(sh $D/done.sh insert {+2})" ;;
-    copy) a="become(sh $D/done.sh copy {+2})" ;;
-    insert_absolute) a="become(sh $D/done.sh insert {+3})" ;;
-    insert_relative) a="become(sh $D/done.sh insert {+4})" ;;
-    copy_absolute) a="become(sh $D/done.sh copy {+3})" ;;
-    copy_relative) a="become(sh $D/done.sh copy {+4})" ;;
+    insert) a='become(sh "$D/done.sh" insert {+2})' ;;
+    copy) a='become(sh "$D/done.sh" copy {+2})' ;;
+    insert_absolute) a='become(sh "$D/done.sh" insert {+3})' ;;
+    insert_relative) a='become(sh "$D/done.sh" insert {+4})' ;;
+    copy_absolute) a='become(sh "$D/done.sh" copy {+3})' ;;
+    copy_relative) a='become(sh "$D/done.sh" copy {+4})' ;;
     close) a=abort ;;
     up | down | first | last) a=$action ;;
     page_up) a=page-up ;;
     page_down) a=page-down ;;
     toggle_preview) a=toggle-preview ;;
-    toggle_dirs) a="reload(sh $D/list.sh toggle-dirs)+first" ;;
+    toggle_dirs) a='reload(sh "$D/list.sh" toggle-dirs)+first' ;;
     toggle_zoxide)
       [ "$has_zoxide" = 1 ] || continue
-      a="reload(sh $D/list.sh toggle-zoxide)+first" ;;
+      a='reload(sh "$D/list.sh" toggle-zoxide)+first' ;;
     *) continue ;;
   esac
   set -- "$@" "--bind=$key:$a"

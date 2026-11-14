@@ -4,49 +4,65 @@ This page explains what happens when you pick a file, and why the plugin is buil
 
 ## The flow
 
+Three parts of Rex take part when you run an action:
+
 ```
- pick_file / pick_zoxide_dir / pick_file_<profile>   (Rex config, client)
-   dir   <- the pane's working directory (terminal process info: the
-            foreground program's cwd, else the shell's)
-   roots <- `roots`: Lua functions are called here; commands stay strings
-   new floating pane on the server that owns the pane:
-     sh -c <picker.sh> <origin> <dir> ... <list.sh> <preview.sh> <done.sh>
-           <mode> <keys> ... <preview rules> <roots>
-                                   |
- picker.sh  (pane's host, /bin/sh, private temp dir removed on exit)
-   writes list.sh, preview.sh, done.sh, rules and roots into the temp dir
-   resolve roots in order: pwd | path (~ expanded) | cmd (run in dir)
-     -> skip missing folders; canonical paths
-   list: fd (or find) per root -> each file once, first root wins
-     rows: display <TAB> path to insert <TAB> absolute path
-   fzf --multi, list on the left, preview on the right
-     insert key -> done.sh insert: host `rex send -b <origin>` "<paths>"
-     copy key   -> done.sh copy: OSC 52 (or copy_cmd)
-     ctrl-t / ctrl-z -> reload the list in another mode
-   focus back to the origin pane; exit closes the floating pane
+ Local Rex server (~/.config/rex/init.lua)
+   pick_file / pick_zoxide_dir / pick_file_<profile>
+     dir   <- terminal.process (local server, else rex.server(ctx.server)):
+              foreground program's cwd, else the pane shell's cwd
+     roots <- Lua `roots` functions run here; `cmd` entries stay strings
+     session.new_layer on the Rex server that owns the pane
+       (interactive = cfg.interactive_shell so ~/.zshrc etc. set PATH):
+       sh -c <picker.sh> file-picker <origin> <dir> <rexcli>
+             <list.sh> <preview.sh> <done.sh> <mode> <binds> ... <rules> <roots>
+                                    |
+                                    v
+ Pane's host (local Rex server, or remote Rex server via rex.host / rex hosts add)
+   picker.sh  (/bin/sh, private temp dir $D removed on exit)
+     writes $D/list.sh, $D/preview.sh, $D/done.sh, $D/rules, $D/rootspec
+     sh "$D/list.sh" resolve: pwd | path (~ expanded) | cmd (run in dir)
+       -> skip missing folders; canonical paths
+     sh "$D/list.sh" list: fd/fdfind (or find) per root, or zoxide query -l
+       rows: display <TAB> path-to-insert <TAB> absolute-path <TAB> path-relative-to-pane
+     fzf --multi (0.38+), list on the left, sh "$D/preview.sh" {3} on the right
+       insert / alt-A / alt-R -> become(sh "$D/done.sh" insert {+2}/{+3}/{+4})
+                                 -> host `rex send -b <origin>` "<paths>"
+       copy   / alt-a / alt-r -> become(sh "$D/done.sh" copy   {+2}/{+3}/{+4})
+                                 -> OSC 52 (or host `copy_cmd`)
+       ctrl-t / ctrl-z        -> reload(sh "$D/list.sh" toggle-dirs / toggle-zoxide)
+     host `rex focus <origin>`; exit closes the floating layer
+                                    |
+                                    v
+ Rex client app
+   renders the floating layer (including kitty graphics from kitten icat and mdcat)
+   receives OSC 52 and updates the local clipboard
 ```
 
-- **Nothing to install on the host but fzf.** The scripts travel as arguments, like the plugin's settings, because the client can't write files on a remote host.
-- **Insert needs no round trip to the client.** The origin pane lives on the same Rex server as the picker, so the host's own `rex send` (found through `REX_BIN_DIR`, which Rex sets in its panes) types into it. The origin block is always passed: with no block, `rex send` would type into the focused pane, which is the picker.
-- **Copy uses OSC 52.** Rex forwards it to the client's clipboard, local or remote. Two details matter: the copy is dropped if the pane closes right after writing it, so the picker waits half a second; and a copy written in the first moment of a new pane can be lost, which a real pick never hits.
-- **Focus** goes back to the origin pane explicitly, because Rex doesn't do that when a floating pane closes.
-- **Lua functions run on the client, commands on the host.** A function can choose by host or build from the pane's directory; a command can look at the host's disk.
+- **No plugin files to install on the host; all CLI tools run there.** The shell scripts and settings travel inline as `argv` because `init.lua` on your local Rex server can't write files onto a remote host. Every tool the picker runs — `fzf` 0.38+ (for `become`), `fd`/`fdfind` or `find`, `mdcat`, `glow`, `bat`/`batcat`, `kitten icat`, `tree`, `file`, `zoxide`, root `cmd`s, `copy_cmd`, and `rex` itself — runs on the pane's host.
+- **Remote panes mean panes on a remote Rex host.** A pane on a host registered with `rex hosts add` / `rex.host` (over SSH, Tailscale, etc.) belongs to that host's Rex server (`ctx.server`), so `session.new_layer` opens the picker there. Typing plain `ssh` inside a local shell pane does not create a remote Rex pane; that pane stays on the local Rex server.
+- **Insert and focus stay on the pane's server.** The origin pane lives on the same Rex server as the picker, so the host's own `rex` CLI (found via `REX_BIN_DIR`, falling back to the local CLI path) runs `rex send -b <origin>` and `rex focus <origin>` with no round trip to the local server. `-b <origin>` is always passed because the focused pane while picking is the picker itself, and `rex focus` is explicit because Rex doesn't restore focus when a floating layer closes.
+- **Four columns per row.** `list.sh` prints `display <TAB> path-to-insert <TAB> absolute-path <TAB> path-relative-to-pane`: `{1}` is shown (`--with-nth=1`), `{+2}` follows the root's `path_style` for `insert`/`copy`, `{+3}` is the canonical absolute path (also passed as `{3}` to `preview.sh`), and `{+4}` is relative to the pane's directory, so `alt-A`/`alt-R` and `alt-a`/`alt-r` need no extra pass.
+- **Copy uses OSC 52.** Rex forwards OSC 52 from local and remote panes alike to the Rex client app's clipboard. Two details matter: the copy is dropped if the pane closes right after writing it, so `done.sh` sleeps 0.5s before exiting; and a copy written in the very first moment of a new pane can be lost, which an interactive pick never hits.
+- **Lua functions run on the local Rex server, commands on the host.** A `roots` function runs in `init.lua` and can branch on `ctx.host` or build from `ctx.pwd`, while a `cmd` root runs on the pane's host in the pane's directory and can inspect its disk.
 
 ## Roots and paths
 
-Roots are resolved in order, and each file is kept under the first root whose canonical folder contains it, so a pane directory inside a git root lists its files once, as pane-directory rows. Rows from roots other than the pane's directory show the root's label. Inserted paths are relative to the pane's directory (`../` as needed) or absolute, per root.
+Roots are resolved in order, and each file is kept under the first root whose canonical folder (`cd -P && pwd -P`) contains it, so a pane directory inside a git root lists its files once, as pane-directory rows. Rows from roots other than `pwd` show `[label]` ahead of the path. Inserted paths are relative to the pane's directory (`../` as needed) or absolute, per root.
 
-Inside the temp dir, fields are separated by `\037` and lists inside a field by `\036`, never by tabs: `read` collapses runs of whitespace separators, which would shift empty fields.
+Inside `$D`, fields are separated by `\037` (US) and lists inside a field by `\036` (RS), never by tabs or spaces: `read` collapses runs of whitespace separators, which would shift empty fields.
 
 ## Previews
 
-`preview.sh` walks the rules in order. The first rule whose pattern matches decides; within it the first command whose first word is installed runs with the path as `$1`. Globs never match folders; `directory` does. `mime:` patterns ask `file --mime-type`, only when a rule needs it. Images use `kitten icat` with `--transfer-mode=stream` (works over remote panes) and `--unicode-placeholder` (fzf keeps the image inside the preview window).
+`preview.sh` walks `$D/rules` in order. The first rule whose pattern matches decides; within it, the first command whose first word is installed on `PATH` runs with the path as `$1`:
 
-## Why this design
+- `directory` matches folders (globs and `mime:` patterns never match folders).
+- `mime:<pattern>` asks `file --mime-type`, only when a rule needs it.
+- A glob with `/` matches the end of the path; any other glob matches the file name.
 
-| Way | Why not |
-|---|---|
-| a helper binary installed on every host | an install step per host; `sh` scripts passed as arguments need none |
-| sending the pick back to the client (a dispatcher watching the pane's title, as rex-fzf-links does) | needed there because links open on the client; here the target pane is on the picker's own server |
-| a real Rex split instead of a floating pane | changes your layout each time, and needs cleanup when it closes |
-| `--git-root` and similar flags | a root with a command (`git rev-parse --show-toplevel`) covers it, and any other folder a command can find |
+Default tool chain:
+
+- Folders: `tree -C -L 2`, then `ls -la`.
+- Markdown (`*.md`, `*.markdown`): `mdcat --ansi --image-protocol kitty` (with a plain `mdcat --ansi` fallback for older `mdcat` without `--image-protocol`), then `glow -w`, `bat`, `batcat`, `cat`.
+- Images (`mime:image/*` and common image extensions): `kitten icat --transfer-mode=stream --unicode-placeholder` (`stream` works over remote panes; `--unicode-placeholder` keeps the image inside fzf's preview box).
+- Everything else (`*`): `bat`, `batcat`, `cat`.

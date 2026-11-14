@@ -4,19 +4,7 @@
 
 Fuzzy-pick files in a [Rex](https://www.superlogical.com/rex) terminal pane with [fzf](https://github.com/junegunn/fzf), from the pane's directory and any other folders you choose, preview them, and insert or copy their paths, in local panes and panes on remote Rex hosts alike. Inspired by [tmux-file-picker](https://github.com/raine/tmux-file-picker).
 
-<!-- TODO: demo GIF, e.g. ![demo](docs/demo.gif) -->
-
-```
-+--------------------------------------------------------------------------+
-| > lua                                    | -- file_picker/config.lua     |
-|   enter insert  ctrl-y copy  ctrl-t dirs | local M = {}                  |
-|   files                                  |                               |
-| > lua/file_picker/config.lua             | local function fail(fmt, ...) |
-|   lua/file_picker/init.lua               |   error("rex-file-picker: "   |
-|   [git] tests/config_test.lua            |   ...                         |
-|   [notes] lua-ideas.md                   |                               |
-+--------------------------------------------------------------------------+
-```
+![demo](docs/demo.gif)
 
 ## Features
 

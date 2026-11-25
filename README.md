@@ -56,6 +56,32 @@ Then, in any pane, press `ctrl+b`, then `f`, then `f` to pick files (`ctrl+b f z
 
 The actions are also in the command palette ("Pick a File", "Pick a Zoxide Directory", and one per profile). They work on the focused pane.
 
+### With Amber
+
+Instead of cloning, you can install the plugin with [Amber](https://github.com/rawnly/amber), which must be installed first. In `~/.config/rex/init.lua`:
+
+```lua
+local amber = dofile(os.getenv("HOME") .. "/.local/share/rex/amber/amber.lua")
+
+amber.setup({
+  plugins = {
+    {
+      "daehyeok/rex-file-picker",
+      main = "file_picker",
+      opts = {
+        roots = {
+          { kind = "pwd" },
+          { label = "git", cmd = "git rev-parse --show-toplevel" },
+        },
+        profiles = { dirs = { mode = "dirs" } },
+      },
+    },
+  },
+})
+```
+
+Then run `amber install`. It installs the plugin and reloads Rex; loading the config alone never installs. Bind the keys as in step 2.
+
 ## Keys
 
 | Key | Does |
